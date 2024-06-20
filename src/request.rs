@@ -15,16 +15,20 @@ pub fn get_zip(
     jvm: String,
     artifact_id: String,
     group_id: String,
+    language: String,
+    name: &String,
 ) -> Result<Vec<u8>> {
-    let deps: Vec<String> = dependencies.iter().map(|d| d.id.clone()).collect();
     let url = format!(
-        "https://start.spring.io/starter.zip?dependencies={}&type={}&javaVersion={}&artifactId={}&groupId={}",
-        deps.join(","),
+        "https://start.spring.io/starter.zip?dependencies={}&type={}&javaVersion={}&artifactId={}&groupId={}&language={}&name={}",
+        dependencies.iter().map(|d| d.id.clone()).collect::<Vec<String>>().join(","),
         build_type.id,
         jvm,
         artifact_id,
-        group_id
+        group_id,
+        language,
+        name
     );
+
     let mut response = reqwest::blocking::get(url)?;
     let mut buf: Vec<u8> = Vec::with_capacity(response.content_length().unwrap_or(0) as usize);
     let _ = response.read_to_end(&mut buf)?;
@@ -33,7 +37,7 @@ pub fn get_zip(
 
 impl fmt::Display for Dependency {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} >> {}", self.id, self.name)
+        write!(f, "{} - {}", self.id, self.name)
     }
 }
 impl fmt::Display for Type {
@@ -47,14 +51,13 @@ impl fmt::Display for Type {
 pub struct SpringResponse {
     pub dependencies: Dependencies,
     pub java_version: JavaVersion,
+    pub language: Language,
     pub group_id: GroupId,
     #[serde(rename = "type")]
     pub build_type: Types,
     pub artifact_id: ArtifactId,
     pub version: Version,
     pub name: Name,
-    pub description: Description,
-    pub package_name: PackageName,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -103,12 +106,28 @@ pub struct JavaVersion {
     #[serde(rename = "type")]
     pub type_field: String,
     pub default: String,
-    pub values: Vec<Java>,
+    pub values: Vec<Jvm>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Java {
+pub struct Jvm {
+    pub id: String,
+    pub name: String,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Language {
+    #[serde(rename = "type")]
+    pub type_field: String,
+    pub default: String,
+    pub values: Vec<Lang>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Lang {
     pub id: String,
     pub name: String,
 }
@@ -140,22 +159,6 @@ pub struct Version {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Name {
-    #[serde(rename = "type")]
-    pub type_field: String,
-    pub default: String,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Description {
-    #[serde(rename = "type")]
-    pub type_field: String,
-    pub default: String,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PackageName {
     #[serde(rename = "type")]
     pub type_field: String,
     pub default: String,
