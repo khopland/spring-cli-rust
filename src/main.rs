@@ -12,6 +12,20 @@ fn main() -> Result<()> {
     let url = args.url.unwrap_or("https://start.spring.io".to_owned());
     let url = url.trim();
 
+    let (name, buf) = get_user_input(url)?;
+
+    let file_name = Text::new("where do you want to store the zip file?")
+        .with_default(format!("./{}.zip", name).as_str())
+        .prompt()?;
+
+    let file_name = file_name.try_resolve()?;
+    let mut file = fs::File::create(file_name)?;
+    file.write_all(&buf)?;
+
+    Ok(())
+}
+
+fn get_user_input(url: &str) -> Result<(String, Vec<u8>)> {
     println!("getting parameter from {}", url);
     let response = get_deps(url)?;
 
@@ -119,14 +133,5 @@ fn main() -> Result<()> {
         &language,
         &name,
     )?;
-
-    let file_name = Text::new("where do you want to store the zip file?")
-        .with_default(format!("./{}.zip", name).as_str())
-        .prompt()?;
-
-    let file_name = file_name.try_resolve()?;
-    let mut file = fs::File::create(file_name)?;
-    file.write_all(&buf)?;
-
-    Ok(())
+    Ok((name, buf))
 }
