@@ -2,17 +2,29 @@ use anyhow::Result;
 use args::Args;
 use clap::Parser;
 use inquire::{MultiSelect, Select, Text};
-use request::{get_deps, get_zip};
+use request::{get_deps, get_zip, SpringResponse};
 use resolve_path::PathResolveExt;
 use std::{fs, io::Write};
+
 mod args;
 mod request;
+
 fn main() -> Result<()> {
     let args = Args::parse();
-    let url = args.url.unwrap_or("https://start.spring.io".to_owned());
+    let url = args
+        .url
+        .to_owned()
+        .unwrap_or("https://start.spring.io".to_owned());
     let url = url.trim();
 
-    let (name, buf) = get_user_input(url)?;
+    println!("getting parameter from {}", url);
+    let response = get_deps(url)?;
+
+    let (name, buf) = if needs_to_get_user_input(&args) {
+        get_zip_based_on_user_input(url, response)?
+    } else {
+        get_zip_based_on_args(url, &args, response)?
+    };
 
     let file_name = Text::new("where do you want to store the zip file?")
         .with_default(format!("./{}.zip", name).as_str())
@@ -25,10 +37,52 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn get_user_input(url: &str) -> Result<(String, Vec<u8>)> {
-    println!("getting parameter from {}", url);
-    let response = get_deps(url)?;
+fn needs_to_get_user_input(args: &Args) -> bool {
+    args.dependencies.is_none()
+        && args.type_build.is_none()
+        && args.java_version.is_none()
+        && args.language.is_none()
+        && args.artifact_id.is_none()
+        && args.group_id.is_none()
+        && args.name.is_none()
+        && args.version_number.is_none()
+}
 
+fn get_zip_based_on_args(
+    url: &str,
+    args: &Args,
+    response: SpringResponse,
+) -> Result<(String, Vec<u8>)> {
+    let name = args.name.to_owned().unwrap_or(response.name.default);
+    let buf = get_zip(
+        url,
+        &args.dependencies.to_owned().unwrap_or_default().join(","),
+        &args
+            .type_build
+            .to_owned()
+            .unwrap_or(response.build_type.default),
+        &args
+            .java_version
+            .to_owned()
+            .unwrap_or(response.java_version.default),
+        &args
+            .artifact_id
+            .to_owned()
+            .unwrap_or(response.artifact_id.default),
+        &args
+            .group_id
+            .to_owned()
+            .unwrap_or(response.group_id.default),
+        &args
+            .language
+            .to_owned()
+            .unwrap_or(response.language.default),
+        &name,
+    )?;
+    Ok((name, buf))
+}
+
+fn get_zip_based_on_user_input(url: &str, response: SpringResponse) -> Result<(String, Vec<u8>)> {
     let deps = MultiSelect::new(
         "Select the dependencies your want:",
         response

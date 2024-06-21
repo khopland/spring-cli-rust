@@ -1,6 +1,6 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::{any, fmt, io::Read};
+use std::{fmt, io::Read};
 
 pub fn get_deps(url: &str) -> Result<SpringResponse> {
     let response = reqwest::blocking::get(url)?;
@@ -8,6 +8,7 @@ pub fn get_deps(url: &str) -> Result<SpringResponse> {
     Ok(response_json)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn get_zip(
     url: &str,
     dependencies: &str,
@@ -22,19 +23,20 @@ pub fn get_zip(
     let url = format!(
         "{}starter.zip?dependencies={}&type={}&javaVersion={}&artifactId={}&groupId={}&language={}&name={}",
         url,
-        dependencies,
-        build_type,
-        jvm,
-        artifact_id,
-        group_id,
-        language,
-        name
+        dependencies.trim(),
+        build_type.trim(),
+        jvm.trim(),
+        artifact_id.trim(),
+        group_id.trim(),
+        language.trim(),
+        name.trim()
     );
 
     let mut response = reqwest::blocking::get(url)?;
     if response.status() != 200 {
         anyhow::bail!("failed to get zip file status code: {}", response.status())
     }
+    dbg!(&response);
 
     let mut buf: Vec<u8> = Vec::with_capacity(response.content_length().unwrap_or(0) as usize);
     let _ = response.read_to_end(&mut buf)?;
