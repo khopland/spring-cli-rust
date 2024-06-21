@@ -1,27 +1,29 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::{fmt, io::Read};
+use std::{any, fmt, io::Read};
 
-pub fn get_deps() -> Result<SpringResponse> {
-    let url: &str = "https://start.spring.io";
+pub fn get_deps(url: &str) -> Result<SpringResponse> {
     let response = reqwest::blocking::get(url)?;
     let response_json = response.json::<SpringResponse>()?;
     Ok(response_json)
 }
 
 pub fn get_zip(
-    dependencies: Vec<&Dependency>,
-    build_type: &Type,
-    jvm: String,
-    artifact_id: String,
-    group_id: String,
-    language: String,
-    name: &String,
+    url: &str,
+    dependencies: &str,
+    build_type: &str,
+    jvm: &str,
+    artifact_id: &str,
+    group_id: &str,
+    language: &str,
+    name: &str,
 ) -> Result<Vec<u8>> {
+    let url = reqwest::Url::parse(url)?;
     let url = format!(
-        "https://start.spring.io/starter.zip?dependencies={}&type={}&javaVersion={}&artifactId={}&groupId={}&language={}&name={}",
-        dependencies.iter().map(|d| d.id.clone()).collect::<Vec<String>>().join(","),
-        build_type.id,
+        "{}starter.zip?dependencies={}&type={}&javaVersion={}&artifactId={}&groupId={}&language={}&name={}",
+        url,
+        dependencies,
+        build_type,
         jvm,
         artifact_id,
         group_id,
@@ -30,6 +32,10 @@ pub fn get_zip(
     );
 
     let mut response = reqwest::blocking::get(url)?;
+    if response.status() != 200 {
+        anyhow::bail!("failed to get zip file status code: {}", response.status())
+    }
+
     let mut buf: Vec<u8> = Vec::with_capacity(response.content_length().unwrap_or(0) as usize);
     let _ = response.read_to_end(&mut buf)?;
     Ok(buf)

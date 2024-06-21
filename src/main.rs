@@ -1,12 +1,19 @@
 use anyhow::Result;
+use args::Args;
+use clap::Parser;
 use inquire::{MultiSelect, Select, Text};
 use request::{get_deps, get_zip};
 use resolve_path::PathResolveExt;
-use std::fs;
+use std::{fs, io::Write};
+mod args;
 mod request;
 fn main() -> Result<()> {
-    println!("getting parameter from spring.io");
-    let response = get_deps()?;
+    let args = Args::parse();
+    let url = args.url.unwrap_or("https://start.spring.io".to_owned());
+    let url = url.trim();
+
+    println!("getting parameter from {}", url);
+    let response = get_deps(url)?;
 
     let deps = MultiSelect::new(
         "Select the dependencies your want:",
@@ -99,12 +106,17 @@ fn main() -> Result<()> {
         .prompt()?;
 
     let buf = get_zip(
-        deps,
-        build_type,
-        jvm,
-        artifact_id,
-        group_id,
-        language,
+        url,
+        &deps
+            .iter()
+            .map(|d| d.id.clone())
+            .collect::<Vec<String>>()
+            .join(","),
+        &build_type.id,
+        &jvm,
+        &artifact_id,
+        &group_id,
+        &language,
         &name,
     )?;
 
@@ -112,7 +124,9 @@ fn main() -> Result<()> {
         .with_default(format!("./{}.zip", name).as_str())
         .prompt()?;
 
-    fs::write(file_name.try_resolve()?, buf)?;
+    let file_name = file_name.try_resolve()?;
+    let mut file = fs::File::create(file_name)?;
+    file.write_all(&buf)?;
 
     Ok(())
 }
