@@ -2,10 +2,12 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::{fmt, io::Read};
 
-pub fn get_deps(url: &str) -> Result<SpringResponse> {
-    let response = reqwest::blocking::get(url)?;
-    let response_json = response.json::<SpringResponse>()?;
-    Ok(response_json)
+impl SpringResponse {
+    pub fn get_options(url: &str) -> Result<Self> {
+        let response = reqwest::blocking::get(url)?;
+        let response_json = response.json::<Self>()?;
+        Ok(response_json)
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -36,10 +38,17 @@ pub fn get_zip(
     if response.status() != 200 {
         anyhow::bail!("failed to get zip file status code: {}", response.status())
     }
-    dbg!(&response);
 
-    let mut buf: Vec<u8> = Vec::with_capacity(response.content_length().unwrap_or(0) as usize);
-    let _ = response.read_to_end(&mut buf)?;
+    let content_length = response.content_length().unwrap_or(0);
+    let mut buf: Vec<u8> = Vec::with_capacity(content_length as usize);
+    let num = response.read_to_end(&mut buf)?;
+    if num != content_length as usize {
+        anyhow::bail!(
+            "failed to read all bites, read {}, but got {} from server",
+            num,
+            content_length
+        )
+    }
     Ok(buf)
 }
 
