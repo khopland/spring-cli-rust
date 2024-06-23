@@ -13,3 +13,7 @@ inquire = "0.7.5"
 anyhow = "1.0.86"
 resolve-path = "0.1.0"
 clap = { version = "4.5.7", features = ["derive"] }
+
+
+[dev-dependencies]
+httpmock = "0.7.0"
