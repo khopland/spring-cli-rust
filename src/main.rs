@@ -14,7 +14,6 @@ fn main() -> Result<()> {
 
     let state = Data::new(args)?;
 
-
     let file_name = Text::new("where do you want to store the zip file?")
         .with_default(format!("./{}.zip", state.get_name()).as_str())
         .prompt()?;

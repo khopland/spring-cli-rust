@@ -3,11 +3,11 @@ name = "spring_cli"
 version = "0.1.0"
 edition = "2021"
 authors = ["Kristoffer Larsen Hopland"]
-rust-version = "1.65.0"
+rust-version = "1.74.0"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
-reqwest = { version = "0.12", features = ["blocking","json"] }
+reqwest = { version = "0.12.5", features = ["blocking","json"] }
 serde_json = "1.0"
 inquire = "0.7.5"
 anyhow = "1.0.86"
