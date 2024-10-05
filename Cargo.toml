@@ -1,9 +1,17 @@
 [package]
-name = "spring_cli"
-version = "0.1.0"
+name = "spring-boot-cli"
+version = "0.0.1"
 edition = "2021"
 authors = ["Kristoffer Larsen Hopland"]
 rust-version = "1.74.0"
+
+readme = "README.md"
+description = "A simple rust cli app to get spring starters"
+repository = "https://github.com/khopland/spring-cli-rust.git"
+keywords = ["cli", "spring"]
+categories = ["command-line-utilities", "development-tools::profiling", "visualization"]
+license = "Apache-2.0"
+exclude = [ "/*.zip"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
