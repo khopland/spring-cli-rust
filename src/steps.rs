@@ -25,6 +25,7 @@ pub struct Item {
     pub id: String,
     pub name: String,
 }
+
 impl Item {
     pub fn new(id: String, name: String) -> Self {
         Item { id, name }
@@ -69,6 +70,37 @@ impl SingleStep {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ActionItem {
+    pub id: String,
+    pub name: String,
+    pub action: String,
+}
+
+impl ActionItem {
+    pub fn new(id: String, name: String, action: String) -> Self {
+        ActionItem { id, name, action }
+    }
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActionStep {
+    pub name: String,
+    pub default: String,
+    pub values: Vec<ActionItem>,
+}
+impl ActionStep {
+    pub fn new(name: String, default: String, values: Vec<ActionItem>) -> Self {
+        ActionStep {
+            name,
+            default,
+            values,
+        }
+    }
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MultiSelectStep {
     pub name: String,
     pub values: Vec<DepGroup>,
@@ -83,7 +115,7 @@ impl MultiSelectStep {
 pub enum Step {
     Text(TextStep),
     SingleSelect(SingleStep),
-    Action(SingleStep),
+    Action(ActionStep),
     MultiSelect(MultiSelectStep),
 }
 
@@ -92,7 +124,7 @@ impl Step {
         match self {
             Step::Text(text_step) => &text_step.name,
             Step::SingleSelect(single_step) => &single_step.name,
-            Step::Action(single_step) => &single_step.name,
+            Step::Action(action_step) => &action_step.name,
             Step::MultiSelect(multi_select_step) => &multi_select_step.name,
         }
     }
@@ -119,12 +151,16 @@ impl Step {
                     &single_step.default,
                 )?,
             }),
-            Step::Action(single_step) => Ok(ResponseStep {
+            Step::Action(action_step) => Ok(ResponseStep {
                 step: self.to_owned(),
                 response: get_single_select(
-                    &single_step.name,
-                    &single_step.values,
-                    &single_step.default,
+                    &action_step.name,
+                    &action_step
+                        .values
+                        .iter()
+                        .map(|v| Item::new(v.id.clone(), v.name.clone()))
+                        .collect(),
+                    &action_step.default,
                 )?,
             }),
             Step::MultiSelect(multi_select_step) => Ok(ResponseStep {
@@ -179,7 +215,7 @@ pub fn parse_options(json: serde_json::Value) -> Result<Vec<Step>> {
                     })
                     .collect(),
             )),
-            "action" => Step::Action(SingleStep::new(
+            "action" => Step::Action(ActionStep::new(
                 key.to_owned(),
                 body["default"]
                     .as_str()
@@ -191,9 +227,13 @@ pub fn parse_options(json: serde_json::Value) -> Result<Vec<Step>> {
                     .iter()
                     .map(|v| {
                         let b = v.as_object().expect("not to be empty");
-                        Item::new(
+                        ActionItem::new(
                             b["id"].as_str().expect("to contain id feld").to_string(),
                             b["name"].as_str().expect("to contain id name").to_string(),
+                            b["action"]
+                                .as_str()
+                                .expect("to contain id action")
+                                .to_string(),
                         )
                     })
                     .collect(),

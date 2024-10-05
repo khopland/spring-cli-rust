@@ -1,8 +1,9 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::{fmt, io::Read};
+use urlencoding::encode;
 
-use crate::steps::ResponseStep;
+use crate::steps::{ResponseStep, Step};
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -109,6 +110,7 @@ impl fmt::Display for Type {
 }
 
 pub fn get_options(url: &str) -> Result<serde_json::Value> {
+    println!("getting parameter from {}", &url);
     let response = reqwest::blocking::get(url)?;
     if response.status() != 200 {
         anyhow::bail!(
@@ -122,15 +124,18 @@ pub fn get_options(url: &str) -> Result<serde_json::Value> {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn get_zip(url: &str, responses: &Vec<ResponseStep>) -> Result<Vec<u8>> {
-    let url = reqwest::Url::parse(url)?;
-
-    let query_params = responses
-        .iter()
-        .map(|res| format!("{}={}", res.step.get_name(), res.response))
-        .collect::<Vec<String>>()
-        .join("&");
-    let url: String = format!("{}starter.zip?{}", url, query_params);
+pub fn get_zip(url: &str, responses: &Vec<ResponseStep>) -> Result<(String, Vec<u8>)> {
+    let mut url = reqwest::Url::parse(url)?;
+    let path = get_path(&responses)
+        .to_owned()
+        .get_or_insert("starter.zip".to_string())
+        .to_string();
+    url.set_path(&path);
+    let mut querys = url.query_pairs_mut();
+    responses.iter().for_each(|q| {
+        querys.append_pair(&encode(q.step.get_name()), &encode(&q.response));
+    });
+    drop(querys);
 
     let mut response = reqwest::blocking::get(url)?;
     if response.status() != 200 {
@@ -138,6 +143,12 @@ pub fn get_zip(url: &str, responses: &Vec<ResponseStep>) -> Result<Vec<u8>> {
     }
 
     let content_length = response.content_length().unwrap_or(0);
+    let content_file = &response
+        .headers()
+        .get("content-disposition")
+        .map(|x| get_file_name(x))
+        .flatten();
+
     let mut buf: Vec<u8> = Vec::with_capacity(content_length as usize);
     let num = response.read_to_end(&mut buf)?;
     if num != content_length as usize {
@@ -147,7 +158,36 @@ pub fn get_zip(url: &str, responses: &Vec<ResponseStep>) -> Result<Vec<u8>> {
             content_length
         )
     }
-    Ok(buf)
+    Ok((
+        content_file
+            .to_owned()
+            .get_or_insert("".to_owned())
+            .to_string(),
+        buf,
+    ))
+}
+
+fn get_path(responses: &Vec<ResponseStep>) -> Option<String> {
+    responses.iter().find_map(|r| match &r.step {
+        Step::Action(s) => s
+            .values
+            .iter()
+            .find(|x| x.id == r.response)
+            .map(|x| x.action.clone()),
+        _ => None,
+    })
+}
+
+fn get_file_name(header: &reqwest::header::HeaderValue) -> Option<String> {
+    let Ok(st) = header.to_str() else {
+        return None;
+    };
+
+    let (_, s) = st.split_once("=")?;
+    let mut chars = s.chars();
+    chars.next();
+    chars.next_back();
+    Some(chars.as_str().to_owned())
 }
 
 #[cfg(test)]
@@ -169,6 +209,6 @@ mod test {
         mock.assert();
         assert!(res.is_ok());
         let res = res.expect("is ok");
-        assert_eq!(res, buf);
+        assert_eq!(res.1, buf);
     }
 }
