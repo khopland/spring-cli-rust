@@ -1,117 +1,15 @@
-use anyhow::Result;
-use serde::{Deserialize, Serialize};
-use std::{fmt, io::Read};
-use urlencoding::encode;
-
 use crate::steps::{ResponseStep, Step};
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SpringResponse {
-    pub dependencies: Dependencies,
-    pub java_version: JavaVersion,
-    pub language: Language,
-    pub group_id: GroupId,
-    #[serde(rename = "type")]
-    pub build_type: Types,
-    pub artifact_id: ArtifactId,
-    pub name: Name,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Dependencies {
-    pub values: Vec<Value>,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Value {
-    pub name: String,
-    pub values: Vec<Dependency>,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Dependency {
-    pub id: String,
-    pub name: String,
-}
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Types {
-    pub default: String,
-    pub values: Vec<Type>,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Type {
-    pub id: String,
-    pub name: String,
-    pub action: String,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct JavaVersion {
-    pub default: String,
-    pub values: Vec<Jvm>,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Jvm {
-    pub id: String,
-    pub name: String,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Language {
-    pub default: String,
-    pub values: Vec<Lang>,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Lang {
-    pub id: String,
-    pub name: String,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GroupId {
-    pub default: String,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ArtifactId {
-    pub default: String,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Name {
-    pub default: String,
-}
-
-impl fmt::Display for Dependency {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} - {}", self.id, self.name)
-    }
-}
-impl fmt::Display for Type {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.name)
-    }
-}
+use anyhow::Result;
+use std::io::Read;
 
 pub fn get_options(url: &str) -> Result<serde_json::Value> {
     println!("getting parameter from {}", &url);
-    let response = reqwest::blocking::get(url)?;
+    let client = reqwest::blocking::Client::new();
+    let response = client
+        .get(url)
+        .header("Accept", "application/vnd.initializr.v2.2+json")
+        .send()?;
+
     if response.status() != 200 {
         anyhow::bail!(
             "failed to get options from {}, status code: {}",
@@ -131,15 +29,22 @@ pub fn get_zip(url: &str, responses: &Vec<ResponseStep>) -> Result<(String, Vec<
         .get_or_insert("starter.zip".to_string())
         .to_string();
     url.set_path(&path);
+
     let mut querys = url.query_pairs_mut();
     responses.iter().for_each(|q| {
-        querys.append_pair(&encode(q.step.get_name()), &encode(&q.response));
+        if !q.response.is_empty() {
+            querys.append_pair(q.step.get_name(), &q.response.replace(" ", "%20"));
+        }
     });
     drop(querys);
 
     let mut response = reqwest::blocking::get(url)?;
     if response.status() != 200 {
-        anyhow::bail!("failed to get zip file status code: {}", response.status())
+        anyhow::bail!(
+            "failed to get zip file status code: {} - {}",
+            response.status(),
+            response.text()?
+        )
     }
 
     let content_length = response.content_length().unwrap_or(0);
