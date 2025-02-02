@@ -22,7 +22,7 @@ pub fn get_options(url: &str) -> Result<serde_json::Value> {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn get_zip(url: &str, responses: &Vec<ResponseStep>) -> Result<(String, Vec<u8>)> {
+pub fn get_zip(url: &str, responses: &Vec<ResponseStep>) -> Result<(Option<String>, Vec<u8>)> {
     let mut url = reqwest::Url::parse(url)?;
     let path = get_path(&responses)
         .to_owned()
@@ -65,9 +65,7 @@ pub fn get_zip(url: &str, responses: &Vec<ResponseStep>) -> Result<(String, Vec<
     }
     Ok((
         content_file
-            .to_owned()
-            .get_or_insert("".to_owned())
-            .to_string(),
+            .to_owned().map(|x| format!("./{}",x)),
         buf,
     ))
 }

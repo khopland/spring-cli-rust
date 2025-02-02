@@ -22,12 +22,17 @@ fn main() -> Result<()> {
         .collect::<Result<Vec<ResponseStep>>>()?;
 
     let (file_name, zip) = get_zip(&args.get_url(), &responses)?;
-    println!("writing data to ./{}", &file_name);
-    write_zip(format!("./{}", &file_name), zip)
+    let p = args.get_path();
+    let path = match p.as_ref().or(file_name.as_ref()) {
+        Some(p) => p,
+        None => &"./spring-app.zip".to_owned(),
+    };
+    write_zip(&path, zip)
 }
 
-fn write_zip(file_name: String, zip: Vec<u8>) -> Result<()> {
+fn write_zip(file_name: &String, zip: Vec<u8>) -> Result<()> {
     let path = file_name.try_resolve()?;
+    println!("writing data to {}", path.display());
     let mut file = fs::File::create(path)?;
     file.write_all(&zip)?;
     Ok(())
