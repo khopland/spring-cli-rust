@@ -21,10 +21,9 @@ pub fn get_options(url: &str) -> Result<serde_json::Value> {
     Ok(response_json)
 }
 
-#[allow(clippy::too_many_arguments)]
-pub fn get_zip(url: &str, responses: &Vec<ResponseStep>) -> Result<(Option<String>, Vec<u8>)> {
+pub fn get_zip(url: &str, responses: &[ResponseStep]) -> Result<(Option<String>, Vec<u8>)> {
     let mut url = reqwest::Url::parse(url)?;
-    let path = get_path(&responses)
+    let path = get_path(responses)
         .to_owned()
         .get_or_insert("starter.zip".to_string())
         .to_string();
@@ -51,8 +50,7 @@ pub fn get_zip(url: &str, responses: &Vec<ResponseStep>) -> Result<(Option<Strin
     let content_file = &response
         .headers()
         .get("content-disposition")
-        .map(|x| get_file_name(x))
-        .flatten();
+        .and_then(get_file_name);
 
     let mut buf: Vec<u8> = Vec::with_capacity(content_length as usize);
     let num = response.read_to_end(&mut buf)?;
@@ -66,10 +64,9 @@ pub fn get_zip(url: &str, responses: &Vec<ResponseStep>) -> Result<(Option<Strin
     Ok((content_file.to_owned().map(|x| format!("./{}", x)), buf))
 }
 
-fn get_path(responses: &Vec<ResponseStep>) -> Option<String> {
+fn get_path(responses: &[ResponseStep]) -> Option<String> {
     responses.iter().find_map(|r| match &r.step {
-        Step::Action(s) => s
-            .values
+        Step::Action { values, .. } => values
             .iter()
             .find(|x| x.id == r.response)
             .map(|x| x.action.clone()),

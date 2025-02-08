@@ -1,14 +1,13 @@
 use anyhow::{Context, Result};
-use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use crate::{
-    args::Args,
-    user_innput::{get_multi_select, get_single_select, get_text},
-};
+#[derive(Debug, Clone, PartialEq)]
+pub struct ResponseStep {
+    pub step: Step,
+    pub response: String,
+}
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Default, Debug, Clone, PartialEq)]
 pub struct DepGroup {
     pub name: String,
     pub values: Vec<Item>,
@@ -19,8 +18,7 @@ impl DepGroup {
     }
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Default, Debug, Clone, PartialEq)]
 pub struct Item {
     pub id: String,
     pub name: String,
@@ -38,38 +36,7 @@ impl fmt::Display for Item {
     }
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TextStep {
-    pub name: String,
-    pub default: String,
-}
-
-impl TextStep {
-    pub fn new(name: String, default: String) -> Self {
-        TextStep { name, default }
-    }
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SingleStep {
-    pub name: String,
-    pub default: String,
-    pub values: Vec<Item>,
-}
-impl SingleStep {
-    pub fn new(name: String, default: String, values: Vec<Item>) -> Self {
-        SingleStep {
-            name,
-            default,
-            values,
-        }
-    }
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Default, Debug, Clone, PartialEq)]
 pub struct ActionItem {
     pub id: String,
     pub name: String,
@@ -82,194 +49,144 @@ impl ActionItem {
     }
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ActionStep {
-    pub name: String,
-    pub default: String,
-    pub values: Vec<ActionItem>,
-}
-impl ActionStep {
-    pub fn new(name: String, default: String, values: Vec<ActionItem>) -> Self {
-        ActionStep {
-            name,
-            default,
-            values,
-        }
-    }
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MultiSelectStep {
-    pub name: String,
-    pub values: Vec<DepGroup>,
-}
-
-impl MultiSelectStep {
-    pub fn new(name: String, values: Vec<DepGroup>) -> Self {
-        MultiSelectStep { name, values }
-    }
-}
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Step {
-    Text(TextStep),
-    SingleSelect(SingleStep),
-    Action(ActionStep),
-    MultiSelect(MultiSelectStep),
+    Text {
+        name: String,
+        default: String,
+    },
+    SingleSelect {
+        name: String,
+        default: String,
+        values: Vec<Item>,
+    },
+    Action {
+        name: String,
+        default: String,
+        values: Vec<ActionItem>,
+    },
+    MultiSelect {
+        name: String,
+        values: Vec<DepGroup>,
+    },
 }
 
 impl Step {
     pub fn get_name(&self) -> &str {
         match self {
-            Step::Text(text_step) => &text_step.name,
-            Step::SingleSelect(single_step) => &single_step.name,
-            Step::Action(action_step) => &action_step.name,
-            Step::MultiSelect(multi_select_step) => &multi_select_step.name,
+            Step::Text { name, .. } => name,
+            Step::SingleSelect { name, .. } => name,
+            Step::Action { name, .. } => name,
+            Step::MultiSelect { name, .. } => name,
         }
     }
-}
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ResponseStep {
-    pub step: Step,
-    pub response: String,
-}
+    pub fn from_json(json: serde_json::Value) -> Result<Vec<Step>> {
+        let json = json.as_object().context("json")?;
 
-impl Step {
-    pub fn get_user_input(&self, _args: &Args) -> Result<ResponseStep> {
-        match self {
-            Step::Text(text_step) => Ok(ResponseStep {
-                step: self.to_owned(),
-                response: get_text(&text_step.name, &text_step.default)?,
-            }),
-            Step::SingleSelect(single_step) => Ok(ResponseStep {
-                step: self.to_owned(),
-                response: get_single_select(
-                    &single_step.name,
-                    &single_step.values,
-                    &single_step.default,
-                )?,
-            }),
-            Step::Action(action_step) => Ok(ResponseStep {
-                step: self.to_owned(),
-                response: get_single_select(
-                    &action_step.name,
-                    &action_step
-                        .values
+        let mut list = Vec::with_capacity(json.len() - 1);
+
+        for (key, value) in json {
+            if key == "_links" {
+                continue;
+            }
+
+            let body = value.as_object().context(key.to_owned())?;
+
+            let Some(t) = body["type"].as_str() else {
+                continue;
+            };
+
+            let step: Step = match t {
+                "text" => Step::Text {
+                    name: key.to_owned(),
+                    default: body["default"]
+                        .as_str()
+                        .context("get default from TextStep")?
+                        .to_string(),
+                },
+                "single-select" => Step::SingleSelect {
+                    name: key.to_owned(),
+                    default: body["default"]
+                        .as_str()
+                        .context("get default from SingleStep")?
+                        .to_string(),
+                    values: body["values"]
+                        .as_array()
+                        .context("value")?
                         .iter()
-                        .map(|v| Item::new(v.id.clone(), v.name.clone()))
+                        .map(|v| {
+                            let b = v.as_object().expect("not to be empty");
+                            Item::new(
+                                b["id"].as_str().expect("to contain id feld").to_string(),
+                                b["name"].as_str().expect("to contain id name").to_string(),
+                            )
+                        })
                         .collect(),
-                    &action_step.default,
-                )?,
-            }),
-            Step::MultiSelect(multi_select_step) => Ok(ResponseStep {
-                step: self.to_owned(),
-                response: get_multi_select(&multi_select_step.name, &multi_select_step.values)?,
-            }),
+                },
+                "action" => Step::Action {
+                    name: key.to_owned(),
+                    default: body["default"]
+                        .as_str()
+                        .context("get default from SingleStep")?
+                        .to_string(),
+                    values: body["values"]
+                        .as_array()
+                        .context("value")?
+                        .iter()
+                        .map(|v| {
+                            let b = v.as_object().expect("not to be empty");
+                            ActionItem::new(
+                                b["id"].as_str().expect("to contain id feld").to_string(),
+                                b["name"].as_str().expect("to contain id name").to_string(),
+                                b["action"]
+                                    .as_str()
+                                    .expect("to contain id action")
+                                    .to_string(),
+                            )
+                        })
+                        .collect(),
+                },
+                "hierarchical-multi-select" => Step::MultiSelect {
+                    name: key.to_owned(),
+                    values: body["values"]
+                        .as_array()
+                        .context("value")?
+                        .iter()
+                        .map(|v| {
+                            let b = v.as_object().expect("not to be empty");
+                            DepGroup::new(
+                                b["name"]
+                                    .as_str()
+                                    .expect("to contain name feld")
+                                    .to_string(),
+                                b["values"]
+                                    .as_array()
+                                    .expect("to contain values")
+                                    .iter()
+                                    .map(|v| {
+                                        Item::new(
+                                            v["id"]
+                                                .as_str()
+                                                .expect("to contain id feld")
+                                                .to_string(),
+                                            v["name"]
+                                                .as_str()
+                                                .expect("to contain id name")
+                                                .to_string(),
+                                        )
+                                    })
+                                    .collect(),
+                            )
+                        })
+                        .collect(),
+                },
+                _ => continue,
+            };
+            list.push(step);
         }
+        Ok(list)
     }
-}
-
-pub fn parse_options(json: serde_json::Value) -> Result<Vec<Step>> {
-    let json = json.as_object().context("json")?;
-
-    let mut list = Vec::with_capacity(json.len() - 1);
-
-    for (key, value) in json {
-        if key == "_links" {
-            continue;
-        }
-
-        let body = value.as_object().context(key.to_owned())?;
-
-        let Some(t) = body["type"].as_str() else {
-            continue;
-        };
-
-        let step: Step = match t {
-            "text" => Step::Text(TextStep::new(
-                key.to_owned(),
-                body["default"]
-                    .as_str()
-                    .context("get default from TextStep")?
-                    .to_string(),
-            )),
-            "single-select" => Step::SingleSelect(SingleStep::new(
-                key.to_owned(),
-                body["default"]
-                    .as_str()
-                    .context("get default from SingleStep")?
-                    .to_string(),
-                body["values"]
-                    .as_array()
-                    .context("value")?
-                    .iter()
-                    .map(|v| {
-                        let b = v.as_object().expect("not to be empty");
-                        Item::new(
-                            b["id"].as_str().expect("to contain id feld").to_string(),
-                            b["name"].as_str().expect("to contain id name").to_string(),
-                        )
-                    })
-                    .collect(),
-            )),
-            "action" => Step::Action(ActionStep::new(
-                key.to_owned(),
-                body["default"]
-                    .as_str()
-                    .context("get default from SingleStep")?
-                    .to_string(),
-                body["values"]
-                    .as_array()
-                    .context("value")?
-                    .iter()
-                    .map(|v| {
-                        let b = v.as_object().expect("not to be empty");
-                        ActionItem::new(
-                            b["id"].as_str().expect("to contain id feld").to_string(),
-                            b["name"].as_str().expect("to contain id name").to_string(),
-                            b["action"]
-                                .as_str()
-                                .expect("to contain id action")
-                                .to_string(),
-                        )
-                    })
-                    .collect(),
-            )),
-            "hierarchical-multi-select" => Step::MultiSelect(MultiSelectStep::new(
-                key.to_owned(),
-                body["values"]
-                    .as_array()
-                    .context("value")?
-                    .iter()
-                    .map(|v| {
-                        let b = v.as_object().expect("not to be empty");
-                        DepGroup::new(
-                            b["name"]
-                                .as_str()
-                                .expect("to contain name feld")
-                                .to_string(),
-                            b["values"]
-                                .as_array()
-                                .expect("to contain values")
-                                .iter()
-                                .map(|v| {
-                                    Item::new(
-                                        v["id"].as_str().expect("to contain id feld").to_string(),
-                                        v["name"].as_str().expect("to contain id name").to_string(),
-                                    )
-                                })
-                                .collect(),
-                        )
-                    })
-                    .collect(),
-            )),
-            _ => continue,
-        };
-        list.push(step);
-    }
-    Ok(list)
 }
 
 #[cfg(test)]
@@ -287,14 +204,17 @@ mod test {
                 "default":"test"
             },
         });
-        let steps = parse_options(json);
+        let steps = Step::from_json(json);
         assert!(steps.is_ok());
         let steps = steps.unwrap();
 
         assert_eq!(steps.len(), 1);
         assert_eq!(
             steps[0],
-            steps::Step::Text(TextStep::new("dep".to_string(), "test".to_string()))
+            steps::Step::Text {
+                name: "dep".to_owned(),
+                default: "test".to_owned()
+            }
         );
     }
 
@@ -320,22 +240,22 @@ mod test {
                 ]
             }
         });
-        let steps = parse_options(json);
+        let steps = Step::from_json(json);
         assert!(steps.is_ok());
         let steps = steps.unwrap();
 
         assert_eq!(steps.len(), 1);
         assert_eq!(
             steps[0],
-            steps::Step::SingleSelect(SingleStep::new(
-                "language".to_string(),
-                "java".to_string(),
-                vec![
+            steps::Step::SingleSelect {
+                name: "language".to_string(),
+                default: "java".to_string(),
+                values: vec![
                     Item::new("java".to_owned(), "Java".to_owned()),
                     Item::new("kotlin".to_owned(), "Kotlin".to_owned()),
                     Item::new("groovy".to_owned(), "Groovy".to_owned())
                 ]
-            ))
+            }
         );
     }
 
@@ -346,23 +266,23 @@ mod test {
                 "type": "hierarchical-multi-select",
                 "values": [{ "name": "Deps","values": [{"id": "native","name": "GraalVM Native Support"}]}]},
         });
-        let steps = parse_options(json);
+        let steps = Step::from_json(json);
         assert!(steps.is_ok());
         let steps = steps.unwrap();
 
         assert_eq!(steps.len(), 1);
         assert_eq!(
             steps[0],
-            steps::Step::MultiSelect(MultiSelectStep::new(
-                "dependencies".to_string(),
-                vec![DepGroup::new(
+            steps::Step::MultiSelect {
+                name: "dependencies".to_string(),
+                values: vec![DepGroup::new(
                     "Deps".to_string(),
                     vec![Item::new(
                         "native".to_string(),
                         "GraalVM Native Support".to_owned()
                     )]
                 )]
-            ))
+            }
         );
     }
 
@@ -392,7 +312,7 @@ mod test {
                 "default":"test"
             },
         });
-        let steps = parse_options(json);
+        let steps = Step::from_json(json);
         assert!(steps.is_ok());
         let steps = steps.unwrap();
 
@@ -401,30 +321,30 @@ mod test {
         let _ = steps
             .iter()
             .map(|s| match s {
-                Step::Text(text_step) => {
+                Step::Text { name, default } => {
+                    assert_eq!(name, &"dep".to_owned());
+                    assert_eq!(default, &"test".to_owned());
+                }
+                Step::SingleSelect {
+                    name,
+                    default,
+                    values,
+                } => {
+                    assert_eq!(name, &"language".to_owned());
+                    assert_eq!(default, &"java".to_owned());
                     assert_eq!(
-                        *text_step,
-                        TextStep::new("dep".to_string(), "test".to_string(),)
+                        values,
+                        &vec![
+                            Item::new("java".to_owned(), "Java".to_owned()),
+                            Item::new("kotlin".to_owned(), "Kotlin".to_owned()),
+                            Item::new("groovy".to_owned(), "Groovy".to_owned())
+                        ]
                     );
                 }
-                Step::SingleSelect(single_step) => {
-                    assert_eq!(
-                        *single_step,
-                        SingleStep::new(
-                            "language".to_string(),
-                            "java".to_string(),
-                            vec![
-                                Item::new("java".to_owned(), "Java".to_owned()),
-                                Item::new("kotlin".to_owned(), "Kotlin".to_owned()),
-                                Item::new("groovy".to_owned(), "Groovy".to_owned())
-                            ]
-                        )
-                    );
-                }
-                Step::Action(_) => {
+                Step::Action { .. } => {
                     panic!("not in test data")
                 }
-                Step::MultiSelect(_) => {
+                Step::MultiSelect { .. } => {
                     panic!("not in test data")
                 }
             })

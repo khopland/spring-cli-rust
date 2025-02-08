@@ -2,19 +2,10 @@ use clap::{command, Parser};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
-pub struct Args {
+pub(crate) struct Args {
     #[arg(short, long)]
-    url: Option<String>,
+    #[clap(default_value = "https://start.spring.io")]
+    pub(crate) url: String,
     #[arg(short, long)]
-    path: Option<String>,
-}
-impl Args {
-    pub fn get_url(&self) -> String {
-        self.url
-            .to_owned()
-            .unwrap_or("https://start.spring.io".to_owned())
-    }
-    pub fn get_path(&self) -> Option<&str> {
-        self.path.as_deref()
-    }
+   pub(crate)  path: Option<String>,
 }
