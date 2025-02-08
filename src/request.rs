@@ -63,11 +63,7 @@ pub fn get_zip(url: &str, responses: &Vec<ResponseStep>) -> Result<(Option<Strin
             content_length
         )
     }
-    Ok((
-        content_file
-            .to_owned().map(|x| format!("./{}",x)),
-        buf,
-    ))
+    Ok((content_file.to_owned().map(|x| format!("./{}", x)), buf))
 }
 
 fn get_path(responses: &Vec<ResponseStep>) -> Option<String> {

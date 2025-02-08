@@ -174,15 +174,14 @@ impl Step {
 pub fn parse_options(json: serde_json::Value) -> Result<Vec<Step>> {
     let json = json.as_object().context("json")?;
 
-    let mut list: Vec<Step> = Vec::with_capacity(json.len() - 1);
+    let mut list = Vec::with_capacity(json.len() - 1);
 
     for (key, value) in json {
         if key == "_links" {
             continue;
         }
 
-        let body: &serde_json::Map<String, serde_json::Value> =
-            value.as_object().context(key.clone())?;
+        let body = value.as_object().context(key.to_owned())?;
 
         let Some(t) = body["type"].as_str() else {
             continue;
