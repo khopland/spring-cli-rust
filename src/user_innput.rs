@@ -1,13 +1,14 @@
 use anyhow::Result;
 use inquire::{MultiSelect, Select, Text};
 
-use crate::steps::{DepGroup, Item, ResponseStep, Step};
+use crate::steps::{Item, ResponseStep, Step, StepKind};
 
-fn get_multi_select(name: &str, values: &[DepGroup]) -> Result<String> {
+fn get_multi_select(name: &str, values: &[Item]) -> Result<String> {
     Ok(MultiSelect::new(
         format!("Select the {} you want:", name).as_str(),
-        values.iter().flat_map(|d| d.values.iter()).collect(),
+        values.to_vec(),
     )
+    .with_page_size(11)
     .with_formatter(&|a| {
         a.iter()
             .map(|x| x.value.id.to_owned())
@@ -33,41 +34,35 @@ fn get_single_select(name: &str, values: &[Item], default: &str) -> Result<Strin
 }
 
 fn get_text(name: &str, default: &str) -> Result<String> {
-    Ok(Text::new(format!("What {} do you want:", name).as_str()).with_default(default).prompt()?)
+    Ok(Text::new(format!("What {} do you want:", name).as_str())
+        .with_default(default)
+        .prompt()?)
 }
 
 pub(crate) fn get_user_input(step: &Step) -> Result<ResponseStep> {
-    match step {
-        Step::Text { name, default } => Ok(ResponseStep {
+    match &step.kind {
+        StepKind::Text { default } => Ok(ResponseStep {
             step: step.to_owned(),
-            response: get_text(name, default)?,
+            response: get_text(&step.name, default)?,
         }),
-        Step::SingleSelect {
-            name,
-            default,
-            values,
-        } => Ok(ResponseStep {
+        StepKind::SingleSelect { default, values } => Ok(ResponseStep {
             step: step.to_owned(),
-            response: get_single_select(name, values, default)?,
+            response: get_single_select(&step.name, values, default)?,
         }),
-        Step::Action {
-            name,
-            default,
-            values,
-        } => Ok(ResponseStep {
+        StepKind::Action { default, values } => Ok(ResponseStep {
             step: step.to_owned(),
             response: get_single_select(
-                name,
+                &step.name,
                 &values
                     .iter()
-                    .map(|v| Item::new(v.id.clone(), v.name.clone()))
+                    .map(|v| Item::new_default(v.id.clone(), v.name.clone()))
                     .collect::<Vec<Item>>(),
                 default,
             )?,
         }),
-        Step::MultiSelect { name, values } => Ok(ResponseStep {
+        StepKind::MultiSelect { values } => Ok(ResponseStep {
             step: step.to_owned(),
-            response: get_multi_select(name, values)?,
+            response: get_multi_select(&step.name, values)?,
         }),
     }
 }

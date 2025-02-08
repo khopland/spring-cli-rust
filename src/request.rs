@@ -1,4 +1,4 @@
-use crate::steps::{ResponseStep, Step};
+use crate::steps::{ItemKind, ResponseStep, StepKind};
 use anyhow::Result;
 use std::io::Read;
 
@@ -23,16 +23,16 @@ pub fn get_options(url: &str) -> Result<serde_json::Value> {
 
 pub fn get_zip(url: &str, responses: &[ResponseStep]) -> Result<(Option<String>, Vec<u8>)> {
     let mut url = reqwest::Url::parse(url)?;
-    let path = get_path(responses)
+    let url_path = get_url_path(responses)
         .to_owned()
         .get_or_insert("starter.zip".to_string())
         .to_string();
-    url.set_path(&path);
+    url.set_path(&url_path);
 
     let mut querys = url.query_pairs_mut();
     responses.iter().for_each(|q| {
         if !q.response.is_empty() {
-            querys.append_pair(q.step.get_name(), &q.response.replace(" ", "%20"));
+            querys.append_pair(&q.step.name, &q.response.replace(" ", "%20"));
         }
     });
     drop(querys);
@@ -64,12 +64,17 @@ pub fn get_zip(url: &str, responses: &[ResponseStep]) -> Result<(Option<String>,
     Ok((content_file.to_owned().map(|x| format!("./{}", x)), buf))
 }
 
-fn get_path(responses: &[ResponseStep]) -> Option<String> {
-    responses.iter().find_map(|r| match &r.step {
-        Step::Action { values, .. } => values
-            .iter()
-            .find(|x| x.id == r.response)
-            .map(|x| x.action.clone()),
+fn get_url_path(responses: &[ResponseStep]) -> Option<String> {
+    responses.iter().find_map(|r| match &r.step.kind {
+        StepKind::Action { values, .. } => {
+            values
+                .iter()
+                .find(|x| x.id == r.response)
+                .and_then(|step| match &step.kind {
+                    ItemKind::Action(action) => Some(action.clone()),
+                    _ => None,
+                })
+        }
         _ => None,
     })
 }

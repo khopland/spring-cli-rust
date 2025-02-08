@@ -7,5 +7,5 @@ pub(crate) struct Args {
     #[clap(default_value = "https://start.spring.io")]
     pub(crate) url: String,
     #[arg(short, long)]
-   pub(crate)  path: Option<String>,
+    pub(crate) path: Option<String>,
 }

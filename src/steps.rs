@@ -6,81 +6,68 @@ pub struct ResponseStep {
     pub step: Step,
     pub response: String,
 }
-
-#[derive(Default, Debug, Clone, PartialEq)]
-pub struct DepGroup {
-    pub name: String,
-    pub values: Vec<Item>,
-}
-impl DepGroup {
-    pub fn new(name: String, values: Vec<Item>) -> Self {
-        DepGroup { name, values }
-    }
-}
-
-#[derive(Default, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Item {
     pub id: String,
     pub name: String,
+    pub kind: ItemKind,
+}
+#[derive(Debug, Clone, PartialEq)]
+pub enum ItemKind {
+    Default,
+    Dependency(String),
+    Action(String),
 }
 
 impl Item {
-    pub fn new(id: String, name: String) -> Self {
-        Item { id, name }
+    pub fn new_default(id: String, name: String) -> Self {
+        Item {
+            id,
+            name,
+            kind: ItemKind::Default,
+        }
+    }
+    pub fn new_action(id: String, name: String, action: String) -> Self {
+        Item {
+            id,
+            name,
+            kind: ItemKind::Action(action),
+        }
+    }
+    pub fn new_dependency(id: String, name: String, group: String) -> Self {
+        Item {
+            id,
+            name,
+            kind: ItemKind::Dependency(group),
+        }
     }
 }
 
 impl fmt::Display for Item {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} - {}", self.id, self.name)
+        match &self.kind {
+            ItemKind::Default => write!(f, "{}", self.name),
+            ItemKind::Dependency(group) => write!(f, "{} - ({}) [{}]", self.name, self.id, group),
+            ItemKind::Action(_) => write!(f, "{} - {}", self.name, self.id),
+        }
     }
 }
+#[derive(Debug, Clone, PartialEq)]
 
-#[derive(Default, Debug, Clone, PartialEq)]
-pub struct ActionItem {
-    pub id: String,
+pub struct Step {
     pub name: String,
-    pub action: String,
-}
-
-impl ActionItem {
-    pub fn new(id: String, name: String, action: String) -> Self {
-        ActionItem { id, name, action }
-    }
+    pub kind: StepKind,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Step {
-    Text {
-        name: String,
-        default: String,
-    },
-    SingleSelect {
-        name: String,
-        default: String,
-        values: Vec<Item>,
-    },
-    Action {
-        name: String,
-        default: String,
-        values: Vec<ActionItem>,
-    },
-    MultiSelect {
-        name: String,
-        values: Vec<DepGroup>,
-    },
+pub enum StepKind {
+    Text { default: String },
+    SingleSelect { default: String, values: Vec<Item> },
+    Action { default: String, values: Vec<Item> },
+    MultiSelect { values: Vec<Item> },
 }
 
 impl Step {
-    pub fn get_name(&self) -> &str {
-        match self {
-            Step::Text { name, .. } => name,
-            Step::SingleSelect { name, .. } => name,
-            Step::Action { name, .. } => name,
-            Step::MultiSelect { name, .. } => name,
-        }
-    }
-
     pub fn from_json(json: serde_json::Value) -> Result<Vec<Step>> {
         let json = json.as_object().context("json")?;
 
@@ -97,16 +84,14 @@ impl Step {
                 continue;
             };
 
-            let step: Step = match t {
-                "text" => Step::Text {
-                    name: key.to_owned(),
+            let kind: StepKind = match t {
+                "text" => StepKind::Text {
                     default: body["default"]
                         .as_str()
                         .context("get default from TextStep")?
                         .to_string(),
                 },
-                "single-select" => Step::SingleSelect {
-                    name: key.to_owned(),
+                "single-select" => StepKind::SingleSelect {
                     default: body["default"]
                         .as_str()
                         .context("get default from SingleStep")?
@@ -117,15 +102,14 @@ impl Step {
                         .iter()
                         .map(|v| {
                             let b = v.as_object().expect("not to be empty");
-                            Item::new(
+                            Item::new_default(
                                 b["id"].as_str().expect("to contain id feld").to_string(),
                                 b["name"].as_str().expect("to contain id name").to_string(),
                             )
                         })
                         .collect(),
                 },
-                "action" => Step::Action {
-                    name: key.to_owned(),
+                "action" => StepKind::Action {
                     default: body["default"]
                         .as_str()
                         .context("get default from SingleStep")?
@@ -136,7 +120,7 @@ impl Step {
                         .iter()
                         .map(|v| {
                             let b = v.as_object().expect("not to be empty");
-                            ActionItem::new(
+                            Item::new_action(
                                 b["id"].as_str().expect("to contain id feld").to_string(),
                                 b["name"].as_str().expect("to contain id name").to_string(),
                                 b["action"]
@@ -147,43 +131,37 @@ impl Step {
                         })
                         .collect(),
                 },
-                "hierarchical-multi-select" => Step::MultiSelect {
-                    name: key.to_owned(),
+                "hierarchical-multi-select" => StepKind::MultiSelect {
                     values: body["values"]
                         .as_array()
                         .context("value")?
                         .iter()
-                        .map(|v| {
+                        .flat_map(|v| {
                             let b = v.as_object().expect("not to be empty");
-                            DepGroup::new(
-                                b["name"]
-                                    .as_str()
-                                    .expect("to contain name feld")
-                                    .to_string(),
-                                b["values"]
-                                    .as_array()
-                                    .expect("to contain values")
-                                    .iter()
-                                    .map(|v| {
-                                        Item::new(
-                                            v["id"]
-                                                .as_str()
-                                                .expect("to contain id feld")
-                                                .to_string(),
-                                            v["name"]
-                                                .as_str()
-                                                .expect("to contain id name")
-                                                .to_string(),
-                                        )
-                                    })
-                                    .collect(),
-                            )
+                            let group = b["name"]
+                                .as_str()
+                                .expect("group to contain name feld")
+                                .to_string();
+                            b["values"]
+                                .as_array()
+                                .expect("to contain values")
+                                .iter()
+                                .map(move |v| {
+                                    Item::new_dependency(
+                                        v["id"].as_str().expect("to contain id feld").to_string(),
+                                        v["name"].as_str().expect("to contain id name").to_string(),
+                                        group.clone(),
+                                    )
+                                })
                         })
                         .collect(),
                 },
                 _ => continue,
             };
-            list.push(step);
+            list.push(Step {
+                name: key.to_owned(),
+                kind,
+            });
         }
         Ok(list)
     }
@@ -211,9 +189,11 @@ mod test {
         assert_eq!(steps.len(), 1);
         assert_eq!(
             steps[0],
-            steps::Step::Text {
+            Step {
                 name: "dep".to_owned(),
-                default: "test".to_owned()
+                kind: steps::StepKind::Text {
+                    default: "test".to_owned()
+                }
             }
         );
     }
@@ -247,14 +227,16 @@ mod test {
         assert_eq!(steps.len(), 1);
         assert_eq!(
             steps[0],
-            steps::Step::SingleSelect {
+            Step {
                 name: "language".to_string(),
-                default: "java".to_string(),
-                values: vec![
-                    Item::new("java".to_owned(), "Java".to_owned()),
-                    Item::new("kotlin".to_owned(), "Kotlin".to_owned()),
-                    Item::new("groovy".to_owned(), "Groovy".to_owned())
-                ]
+                kind: steps::StepKind::SingleSelect {
+                    default: "java".to_string(),
+                    values: vec![
+                        Item::new_default("java".to_owned(), "Java".to_owned()),
+                        Item::new_default("kotlin".to_owned(), "Kotlin".to_owned()),
+                        Item::new_default("groovy".to_owned(), "Groovy".to_owned())
+                    ]
+                }
             }
         );
     }
@@ -273,15 +255,15 @@ mod test {
         assert_eq!(steps.len(), 1);
         assert_eq!(
             steps[0],
-            steps::Step::MultiSelect {
+            Step {
                 name: "dependencies".to_string(),
-                values: vec![DepGroup::new(
-                    "Deps".to_string(),
-                    vec![Item::new(
+                kind: steps::StepKind::MultiSelect {
+                    values: vec![Item::new_dependency(
                         "native".to_string(),
-                        "GraalVM Native Support".to_owned()
+                        "GraalVM Native Support".to_owned(),
+                        "Deps".to_string(),
                     )]
-                )]
+                }
             }
         );
     }
@@ -320,31 +302,27 @@ mod test {
 
         let _ = steps
             .iter()
-            .map(|s| match s {
-                Step::Text { name, default } => {
-                    assert_eq!(name, &"dep".to_owned());
+            .map(|s| match &s.kind {
+                StepKind::Text { default } => {
+                    assert_eq!(&s.name, &"dep".to_owned());
                     assert_eq!(default, &"test".to_owned());
                 }
-                Step::SingleSelect {
-                    name,
-                    default,
-                    values,
-                } => {
-                    assert_eq!(name, &"language".to_owned());
+                StepKind::SingleSelect { default, values } => {
+                    assert_eq!(&s.name, &"language".to_owned());
                     assert_eq!(default, &"java".to_owned());
                     assert_eq!(
                         values,
                         &vec![
-                            Item::new("java".to_owned(), "Java".to_owned()),
-                            Item::new("kotlin".to_owned(), "Kotlin".to_owned()),
-                            Item::new("groovy".to_owned(), "Groovy".to_owned())
+                            Item::new_default("java".to_owned(), "Java".to_owned()),
+                            Item::new_default("kotlin".to_owned(), "Kotlin".to_owned()),
+                            Item::new_default("groovy".to_owned(), "Groovy".to_owned())
                         ]
                     );
                 }
-                Step::Action { .. } => {
+                StepKind::Action { .. } => {
                     panic!("not in test data")
                 }
-                Step::MultiSelect { .. } => {
+                StepKind::MultiSelect { .. } => {
                     panic!("not in test data")
                 }
             })
