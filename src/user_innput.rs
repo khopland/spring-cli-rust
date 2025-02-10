@@ -1,7 +1,13 @@
 use anyhow::Result;
 use inquire::{MultiSelect, Select, Text};
 
-use crate::steps::{Item, ResponseStep, Step, StepKind};
+use crate::steps::{Item, Step, StepKind};
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ResponseStep {
+    pub step: Step,
+    pub response: String,
+}
 
 fn get_multi_select(name: &str, values: &[Item]) -> Result<String> {
     Ok(MultiSelect::new(
@@ -40,29 +46,15 @@ fn get_text(name: &str, default: &str) -> Result<String> {
 }
 
 pub(crate) fn get_user_input(step: &Step) -> Result<ResponseStep> {
-    match &step.kind {
-        StepKind::Text { default } => Ok(ResponseStep {
-            step: step.to_owned(),
-            response: get_text(&step.name, default)?,
-        }),
-        StepKind::SingleSelect { default, values } => Ok(ResponseStep {
-            step: step.to_owned(),
-            response: get_single_select(&step.name, values, default)?,
-        }),
-        StepKind::Action { default, values } => Ok(ResponseStep {
-            step: step.to_owned(),
-            response: get_single_select(
-                &step.name,
-                &values
-                    .iter()
-                    .map(|v| Item::new_default(v.id.clone(), v.name.clone()))
-                    .collect::<Vec<Item>>(),
-                default,
-            )?,
-        }),
-        StepKind::MultiSelect { values } => Ok(ResponseStep {
-            step: step.to_owned(),
-            response: get_multi_select(&step.name, values)?,
-        }),
-    }
+    Ok(ResponseStep {
+        step: step.to_owned(),
+        response: match &step.kind {
+            StepKind::Text { default } => get_text(&step.name, default)?,
+            StepKind::SingleSelect { default, values } => {
+                get_single_select(&step.name, values, default)?
+            }
+            StepKind::Action { default, values } => get_single_select(&step.name, values, default)?,
+            StepKind::MultiSelect { values } => get_multi_select(&step.name, values)?,
+        },
+    })
 }

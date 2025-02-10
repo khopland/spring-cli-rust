@@ -2,11 +2,6 @@ use anyhow::{Context, Result};
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ResponseStep {
-    pub step: Step,
-    pub response: String,
-}
-#[derive(Debug, Clone, PartialEq)]
 pub struct Item {
     pub id: String,
     pub name: String,
@@ -48,7 +43,7 @@ impl fmt::Display for Item {
         match &self.kind {
             ItemKind::Default => write!(f, "{}", self.name),
             ItemKind::Dependency(group) => write!(f, "{} - ({}) [{}]", self.name, self.id, group),
-            ItemKind::Action(_) => write!(f, "{} - {}", self.name, self.id),
+            ItemKind::Action(_) => write!(f, "{}", self.name),
         }
     }
 }

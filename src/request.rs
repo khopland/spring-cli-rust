@@ -1,4 +1,7 @@
-use crate::steps::{ItemKind, ResponseStep, StepKind};
+use crate::{
+    steps::{ItemKind, StepKind},
+    user_innput::ResponseStep,
+};
 use anyhow::Result;
 use std::io::Read;
 

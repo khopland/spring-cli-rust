@@ -5,7 +5,8 @@ use args::Args;
 use clap::Parser;
 use request::get_zip;
 use resolve_path::PathResolveExt;
-use steps::{ResponseStep, Step};
+use steps::Step;
+use user_innput::ResponseStep;
 
 mod args;
 mod request;
@@ -16,7 +17,7 @@ fn main() -> Result<()> {
     let args = Args::parse();
     let json = request::get_options(&args.url)?;
 
-    let responses: Vec<ResponseStep> = Step::from_json(json)?
+    let responses = Step::from_json(json)?
         .into_iter()
         .map(|step| user_innput::get_user_input(&step.to_owned()))
         .collect::<Result<Vec<ResponseStep>>>()?;
