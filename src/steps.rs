@@ -161,7 +161,7 @@ impl Step {
                 _ => continue,
             };
             list.push(Step {
-                name: key.to_owned(),
+                name: body["id"].as_str().context("expect to have id")?.to_owned(),
                 kind,
             });
         }
@@ -179,9 +179,10 @@ mod test {
     #[test]
     fn test_text() {
         let json = json!({
-            "dep":{
-                "type":"text",
-                "default":"test"
+            "groupeId":{
+                "id":"groupeId",
+                "type":"TEXT",
+                "content":"test"
             },
         });
         let steps = Step::from_json(json);
@@ -192,7 +193,7 @@ mod test {
         assert_eq!(
             steps[0],
             Step {
-                name: "dep".to_owned(),
+                name: "groupeId".to_owned(),
                 kind: steps::StepKind::Text {
                     default: "test".to_owned()
                 }
@@ -307,7 +308,7 @@ mod test {
         assert_eq!(
             steps[0],
             Step {
-                name: "types".to_string(),
+                name: "type".to_string(),
                 kind: steps::StepKind::Action {
                     default: "gradle-project".to_owned(),
                     values: vec![Item::new_action(
@@ -323,7 +324,8 @@ mod test {
     #[test]
     fn test_multible_parse() {
         let json = json!({
-            "language": {
+            "languages": {
+                "id":"language",
                 "type": "SINGLE_SELECT",
                 "content": [
                     {
@@ -343,7 +345,8 @@ mod test {
                     }
                 ]
             },
-               "dep":{
+               "deps":{
+                "id":"dep",
                 "type":"TEXT",
                 "content":"test"
             },

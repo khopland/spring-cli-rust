@@ -94,6 +94,8 @@ fn get_file_name(header: &reqwest::header::HeaderValue) -> Option<String> {
 
 #[cfg(test)]
 mod test {
+    use crate::steps::{Item, Step};
+
     use super::*;
     use httpmock::prelude::*;
 
@@ -106,7 +108,23 @@ mod test {
             then.status(200).body(&buf);
         });
 
-        let res = get_zip(&reqwest::Url::parse(&server.url("/")).unwrap(), &vec![]);
+        let res = get_zip(
+            &reqwest::Url::parse(&server.url("/")).unwrap(),
+            &vec![ResponseStep {
+                step: Step {
+                    name: "type".to_owned(),
+                    kind: StepKind::Action {
+                        default: "".to_string(),
+                        values: vec![Item::new_action(
+                            "java".to_string(),
+                            "java".to_owned(),
+                            "/starter.zip".to_owned(),
+                        )],
+                    },
+                },
+                response: "java".to_owned(),
+            }],
+        );
 
         mock.assert();
         assert!(res.is_ok());
