@@ -385,4 +385,369 @@ mod test {
             })
             .collect::<()>();
     }
+
+    #[test]
+    fn test_with_start_spring_response() {
+        let json = json!({
+            "configuration": {
+                "env": {
+                    "artifactRepository": "https://repo.spring.io/release/",
+                    "springBootMetadataUrl": "https://api.spring.io/projects/spring-boot/releases",
+                    "googleAnalyticsTrackingCode": null,
+                    "fallbackApplicationName": "Application",
+                    "kotlin": {
+                        "defaultVersion": null,
+                        "mappings": []
+                    },
+                    "maven": {
+                        "parent": {
+                            "groupId": null,
+                            "artifactId": null,
+                            "version": null,
+                            "relativePath": "",
+                            "includeSpringBootBom": false
+                        }
+                    },
+                    "platform": {
+                        "compatibilityRange": "3.3.0",
+                        "v1FormatCompatibilityRange": null,
+                        "v2FormatCompatibilityRange": null
+                    }
+                }
+            },
+            "dependencies": {
+                "id": "dependencies",
+                "type": "HIERARCHICAL_MULTI_SELECT",
+                "title": "Project dependencies",
+                "description": "dependency identifiers (comma-separated)",
+                "content": [
+                    {
+                        "name": "Developer Tools",
+                        "content": [
+                            {
+                                "name": "GraalVM Native Support",
+                                "id": "native",
+                                "groupId": "org.springframework.boot",
+                                "artifactId": "spring-boot",
+                                "scope": "compile",
+                                "description": "Support for compiling Spring applications to native executables using the GraalVM native-image compiler.",
+                                "starter": false
+                            },
+                            {
+                                "name": "GraphQL DGS Code Generation",
+                                "id": "dgs-codegen",
+                                "groupId": "com.netflix.graphql.dgs.codegen",
+                                "artifactId": "graphql-dgs-codegen-gradle",
+                                "version": "7.0.3",
+                                "scope": "compile",
+                                "description": "Generate data types and type-safe APIs for querying GraphQL APIs by parsing schema files.",
+                                "starter": false
+                            },
+                            {
+                                "name": "Spring Boot DevTools",
+                                "id": "devtools",
+                                "groupId": "org.springframework.boot",
+                                "artifactId": "spring-boot-devtools",
+                                "scope": "runtime",
+                                "description": "Provides fast application restarts, LiveReload, and configurations for enhanced development experience.",
+                                "starter": false
+                            },
+                            {
+                                "name": "Lombok",
+                                "id": "lombok",
+                                "groupId": "org.projectlombok",
+                                "artifactId": "lombok",
+                                "scope": "annotationProcessor",
+                                "description": "Java annotation library which helps to reduce boilerplate code.",
+                                "starter": false
+                            },
+                            {
+                                "name": "Spring Configuration Processor",
+                                "id": "configuration-processor",
+                                "groupId": "org.springframework.boot",
+                                "artifactId": "spring-boot-configuration-processor",
+                                "scope": "annotationProcessor",
+                                "description": "Generate metadata for developers to offer contextual help and \"code completion\" when working with custom configuration keys (ex.application.properties/.yml files).",
+                                "starter": false
+                            },
+                            {
+                                "name": "Docker Compose Support",
+                                "id": "docker-compose",
+                                "groupId": "org.springframework.boot",
+                                "artifactId": "spring-boot-docker-compose",
+                                "scope": "runtime",
+                                "description": "Provides docker compose support for enhanced development experience.",
+                                "starter": false
+                            },
+                            {
+                                "name": "Spring Modulith",
+                                "id": "modulith",
+                                "groupId": "org.springframework.modulith",
+                                "artifactId": "spring-modulith-starter-core",
+                                "scope": "compile",
+                                "description": "Support for building modular monolithic applications.",
+                                "compatibilityRange": "[3.3.0,3.5.0-M1)",
+                                "bom": "spring-modulith",
+                                "starter": true
+                            }
+                        ]
+                    },
+                    {
+                        "name": "Web",
+                        "content": [
+                            {
+                                "name": "Spring Web",
+                                "id": "web",
+                                "facets": [
+                                    "web",
+                                    "json"
+                                ],
+                                "groupId": "org.springframework.boot",
+                                "artifactId": "spring-boot-starter-web",
+                                "scope": "compile",
+                                "description": "Build web, including RESTful, applications using Spring MVC. Uses Apache Tomcat as the default embedded container.",
+                                "starter": true,
+                                "links": [
+                                    {
+                                        "rel": "guide",
+                                        "href": "https://spring.io/guides/gs/rest-service/",
+                                        "description": "Building a RESTful Web Service"
+                                    },
+                                    {
+                                        "rel": "reference",
+                                        "href": "https://docs.spring.io/spring-boot/{bootVersion}/reference/web/servlet.html",
+                                        "templated": true
+                                    },
+                                    {
+                                        "rel": "guide",
+                                        "href": "https://spring.io/guides/gs/serving-web-content/",
+                                        "description": "Serving Web Content with Spring MVC"
+                                    },
+                                    {
+                                        "rel": "guide",
+                                        "href": "https://spring.io/guides/tutorials/rest/",
+                                        "description": "Building REST services with Spring"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
+            "types": {
+                "id": "type",
+                "type": "ACTION",
+                "title": "Type",
+                "description": "project type",
+                "content": [
+                    {
+                        "name": "Gradle - Groovy",
+                        "id": "gradle-project",
+                        "description": "Generate a Gradle based project archive using the Groovy DSL.",
+                        "action": "/starter.zip",
+                        "tags": {
+                            "build": "gradle",
+                            "dialect": "groovy",
+                            "format": "project"
+                        },
+                        "default": true
+                    },
+                    {
+                        "name": "Gradle - Kotlin",
+                        "id": "gradle-project-kotlin",
+                        "description": "Generate a Gradle based project archive using the Kotlin DSL.",
+                        "action": "/starter.zip",
+                        "tags": {
+                            "build": "gradle",
+                            "dialect": "kotlin",
+                            "format": "project"
+                        },
+                        "default": false
+                    },
+                    {
+                        "name": "Gradle Config",
+                        "id": "gradle-build",
+                        "description": "Generate a Gradle build file.",
+                        "action": "/build.gradle",
+                        "tags": {
+                            "build": "gradle",
+                            "format": "build"
+                        },
+                        "default": false
+                    },
+                    {
+                        "name": "Maven",
+                        "id": "maven-project",
+                        "description": "Generate a Maven based project archive.",
+                        "action": "/starter.zip",
+                        "tags": {
+                            "build": "maven",
+                            "format": "project"
+                        },
+                        "default": false
+                    },
+                    {
+                        "name": "Maven POM",
+                        "id": "maven-build",
+                        "description": "Generate a Maven pom.xml.",
+                        "action": "/pom.xml",
+                        "tags": {
+                            "build": "maven",
+                            "format": "build"
+                        },
+                        "default": false
+                    }
+                ]
+            },
+            "bootVersions": {
+                "id": "bootVersion",
+                "type": "SINGLE_SELECT",
+                "title": "Spring Boot Version",
+                "description": "spring boot version",
+                "content": [
+                    {
+                        "name": "3.5.0 (SNAPSHOT)",
+                        "id": "3.5.0-SNAPSHOT",
+                        "default": false
+                    },
+                    {
+                        "name": "3.5.0 (M1)",
+                        "id": "3.5.0-M1",
+                        "default": false
+                    },
+                    {
+                        "name": "3.4.3 (SNAPSHOT)",
+                        "id": "3.4.3-SNAPSHOT",
+                        "default": false
+                    },
+                    {
+                        "name": "3.4.2",
+                        "id": "3.4.2",
+                        "default": true
+                    },
+                    {
+                        "name": "3.3.9 (SNAPSHOT)",
+                        "id": "3.3.9-SNAPSHOT",
+                        "default": false
+                    },
+                    {
+                        "name": "3.3.8",
+                        "id": "3.3.8",
+                        "default": false
+                    }
+                ]
+            },
+            "packagings": {
+                "id": "packaging",
+                "type": "SINGLE_SELECT",
+                "title": "Packaging",
+                "description": "project packaging",
+                "content": [
+                    {
+                        "name": "Jar",
+                        "id": "jar",
+                        "default": true
+                    },
+                    {
+                        "name": "War",
+                        "id": "war",
+                        "default": false
+                    }
+                ]
+            },
+            "javaVersions": {
+                "id": "javaVersion",
+                "type": "SINGLE_SELECT",
+                "title": "Java Version",
+                "description": "language level",
+                "content": [
+                    {
+                        "name": "23",
+                        "id": "23",
+                        "default": false
+                    },
+                    {
+                        "name": "21",
+                        "id": "21",
+                        "default": false
+                    },
+                    {
+                        "name": "17",
+                        "id": "17",
+                        "default": true
+                    }
+                ]
+            },
+            "languages": {
+                "id": "language",
+                "type": "SINGLE_SELECT",
+                "title": "Language",
+                "description": "programming language",
+                "content": [
+                    {
+                        "name": "Java",
+                        "id": "java",
+                        "default": true
+                    },
+                    {
+                        "name": "Kotlin",
+                        "id": "kotlin",
+                        "default": false
+                    },
+                    {
+                        "name": "Groovy",
+                        "id": "groovy",
+                        "default": false
+                    }
+                ]
+            },
+            "name": {
+                "id": "name",
+                "type": "TEXT",
+                "title": "Name",
+                "description": "project name (infer application name)",
+                "content": "demo"
+            },
+            "description": {
+                "id": "description",
+                "type": "TEXT",
+                "title": "Description",
+                "description": "project description",
+                "content": "Demo project for Spring Boot"
+            },
+            "groupId": {
+                "id": "groupId",
+                "type": "TEXT",
+                "title": "Group",
+                "description": "project coordinates",
+                "content": "com.example"
+            },
+            "artifactId": {
+                "id": "artifactId",
+                "type": "TEXT",
+                "title": "Artifact",
+                "description": "project coordinates (infer archive name)",
+                "content": "demo"
+            },
+            "version": {
+                "id": "version",
+                "type": "TEXT",
+                "title": "Version",
+                "description": "project version",
+                "content": "0.0.1-SNAPSHOT"
+            },
+            "packageName": {
+                "id": "packageName",
+                "type": "TEXT",
+                "title": "Package Name",
+                "description": "root package",
+                "content": "com.example.demo"
+            }
+        });
+        let steps = Step::from_json(json);
+        assert!(steps.is_ok());
+        let steps = steps.unwrap();
+
+        assert_eq!(steps.len(), 12);
+    }
 }
