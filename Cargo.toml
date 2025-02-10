@@ -9,13 +9,17 @@ readme = "README.md"
 description = "A simple rust cli app to get spring starters"
 repository = "https://github.com/khopland/spring-cli-rust.git"
 keywords = ["cli", "spring"]
-categories = ["command-line-utilities", "development-tools::profiling", "visualization"]
+categories = [
+    "command-line-utilities",
+    "development-tools::profiling",
+    "visualization",
+]
 license = "Apache-2.0"
-exclude = [ "/*.zip"]
+exclude = ["/*.zip"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
-reqwest = { version = "0.12.5", features = ["blocking","json"] }
+reqwest = { version = "0.12.5", features = ["blocking", "json"] }
 serde_json = "1.0"
 inquire = "0.7.5"
 anyhow = "1.0.86"

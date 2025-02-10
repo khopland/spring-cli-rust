@@ -2,35 +2,32 @@ use crate::{
     steps::{ItemKind, StepKind},
     user_innput::ResponseStep,
 };
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::io::Read;
 
-pub fn get_options(url: &str) -> Result<serde_json::Value> {
+pub fn get_options(url: &reqwest::Url) -> Result<serde_json::Value> {
+    let mut url = url.clone();
+    url.set_path("/metadata/config");
     println!("getting parameter from {}", &url);
-    let client = reqwest::blocking::Client::new();
-    let response = client
-        .get(url)
-        .header("Accept", "application/vnd.initializr.v2.2+json")
-        .send()?;
+    let response = reqwest::blocking::get(url)?;
 
     if response.status() != 200 {
         anyhow::bail!(
             "failed to get options from {}, status code: {}",
-            url,
+            response.url(),
             response.status()
         )
     }
-    let response_json = response.json()?;
-    Ok(response_json)
+    response.json().context("expect json back")
 }
 
-pub fn get_zip(url: &str, responses: &[ResponseStep]) -> Result<(Option<String>, Vec<u8>)> {
-    let mut url = reqwest::Url::parse(url)?;
-    let url_path = get_url_path(responses)
-        .to_owned()
-        .get_or_insert("starter.zip".to_string())
-        .to_string();
-    url.set_path(&url_path);
+pub fn get_zip(
+    url: &reqwest::Url,
+    responses: &[ResponseStep],
+) -> Result<(Option<String>, Vec<u8>)> {
+    let mut url = url.clone();
+    let url_path = get_url_path(responses).context("action need to be set")?;
+    url.set_path(url_path);
 
     let mut querys = url.query_pairs_mut();
     responses.iter().for_each(|q| {
@@ -43,8 +40,9 @@ pub fn get_zip(url: &str, responses: &[ResponseStep]) -> Result<(Option<String>,
     let mut response = reqwest::blocking::get(url)?;
     if response.status() != 200 {
         anyhow::bail!(
-            "failed to get zip file status code: {} - {}",
+            "failed to get file status code: {}, from {} - {}",
             response.status(),
+            response.url().clone(),
             response.text()?
         )
     }
@@ -67,14 +65,14 @@ pub fn get_zip(url: &str, responses: &[ResponseStep]) -> Result<(Option<String>,
     Ok((content_file.to_owned().map(|x| format!("./{}", x)), buf))
 }
 
-fn get_url_path(responses: &[ResponseStep]) -> Option<String> {
+fn get_url_path(responses: &[ResponseStep]) -> Option<&str> {
     responses.iter().find_map(|r| match &r.step.kind {
         StepKind::Action { values, .. } => {
             values
                 .iter()
                 .find(|x| x.id == r.response)
                 .and_then(|step| match &step.kind {
-                    ItemKind::Action(action) => Some(action.clone()),
+                    ItemKind::Action(action) => Some(action.as_str()),
                     _ => None,
                 })
         }
@@ -96,6 +94,8 @@ fn get_file_name(header: &reqwest::header::HeaderValue) -> Option<String> {
 
 #[cfg(test)]
 mod test {
+    use crate::steps::{Item, Step};
+
     use super::*;
     use httpmock::prelude::*;
 
@@ -108,7 +108,23 @@ mod test {
             then.status(200).body(&buf);
         });
 
-        let res = get_zip(&server.url("/"), &vec![]);
+        let res = get_zip(
+            &reqwest::Url::parse(&server.url("/")).unwrap(),
+            &vec![ResponseStep {
+                step: Step {
+                    name: "type".to_owned(),
+                    kind: StepKind::Action {
+                        default: "".to_string(),
+                        values: vec![Item::new_action(
+                            "java".to_string(),
+                            "java".to_owned(),
+                            "/starter.zip".to_owned(),
+                        )],
+                    },
+                },
+                response: "java".to_owned(),
+            }],
+        );
 
         mock.assert();
         assert!(res.is_ok());
