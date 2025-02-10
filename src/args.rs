@@ -5,7 +5,7 @@ use clap::{command, Parser};
 pub(crate) struct Args {
     #[arg(short, long)]
     #[clap(default_value = "https://start.spring.io")]
-    pub(crate) url: String,
+    pub(crate) url: reqwest::Url,
     #[arg(short, long)]
     pub(crate) path: Option<String>,
 }

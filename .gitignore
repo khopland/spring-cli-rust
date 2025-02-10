@@ -2,5 +2,6 @@
 *.zip
 /test
 .DS_Store
-build.gradle
+*.gradle
+*.java
 pom.xml

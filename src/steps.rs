@@ -68,83 +68,90 @@ impl Step {
 
         let mut list = Vec::with_capacity(json.len() - 1);
 
-        for (key, value) in json {
-            if key == "_links" {
+        for (key, body) in json {
+            if key == "configuration" {
                 continue;
             }
-
-            let body = value.as_object().context(key.to_owned())?;
 
             let Some(t) = body["type"].as_str() else {
                 continue;
             };
 
             let kind: StepKind = match t {
-                "text" => StepKind::Text {
-                    default: body["default"]
+                "TEXT" => StepKind::Text {
+                    default: body["content"]
                         .as_str()
                         .context("get default from TextStep")?
                         .to_string(),
                 },
-                "single-select" => StepKind::SingleSelect {
-                    default: body["default"]
-                        .as_str()
-                        .context("get default from SingleStep")?
-                        .to_string(),
-                    values: body["values"]
+                "SINGLE_SELECT" => {
+                    let content = body["content"]
                         .as_array()
-                        .context("value")?
+                        .context("get content single select")?;
+
+                    let default = content
+                        .iter()
+                        .find(|v| v["default"].as_bool().expect("to be a boolean"))
+                        .expect("to have a default value")["id"]
+                        .as_str()
+                        .expect("to have id")
+                        .to_owned();
+
+                    let values = content
                         .iter()
                         .map(|v| {
-                            let b = v.as_object().expect("not to be empty");
                             Item::new_default(
-                                b["id"].as_str().expect("to contain id feld").to_string(),
-                                b["name"].as_str().expect("to contain id name").to_string(),
+                                v["id"].as_str().expect("to contain id").to_string(),
+                                v["name"].as_str().expect("to contain name").to_string(),
                             )
                         })
-                        .collect(),
-                },
-                "action" => StepKind::Action {
-                    default: body["default"]
+                        .collect();
+
+                    StepKind::SingleSelect { default, values }
+                }
+                "ACTION" => {
+                    let content: &Vec<serde_json::Value> =
+                        body["content"].as_array().context("get content action")?;
+
+                    let default = content
+                        .iter()
+                        .find(|v| v["default"].as_bool().expect("to be a boolean"))
+                        .expect("to have a default value")["id"]
                         .as_str()
-                        .context("get default from SingleStep")?
-                        .to_string(),
-                    values: body["values"]
-                        .as_array()
-                        .context("value")?
+                        .expect("to have id")
+                        .to_owned();
+
+                    let values = content
                         .iter()
                         .map(|v| {
-                            let b = v.as_object().expect("not to be empty");
                             Item::new_action(
-                                b["id"].as_str().expect("to contain id feld").to_string(),
-                                b["name"].as_str().expect("to contain id name").to_string(),
-                                b["action"]
-                                    .as_str()
-                                    .expect("to contain id action")
-                                    .to_string(),
+                                v["id"].as_str().expect("to contain id").to_string(),
+                                v["name"].as_str().expect("to contain name").to_string(),
+                                v["action"].as_str().expect("to contain action").to_string(),
                             )
                         })
-                        .collect(),
-                },
-                "hierarchical-multi-select" => StepKind::MultiSelect {
-                    values: body["values"]
+                        .collect();
+
+                    StepKind::Action { default, values }
+                }
+                "HIERARCHICAL_MULTI_SELECT" => StepKind::MultiSelect {
+                    values: body["content"]
                         .as_array()
-                        .context("value")?
+                        .context("expectet content")?
                         .iter()
                         .flat_map(|v| {
-                            let b = v.as_object().expect("not to be empty");
-                            let group = b["name"]
+                            let group = v["name"]
                                 .as_str()
-                                .expect("group to contain name feld")
+                                .expect("group to contain name")
                                 .to_string();
-                            b["values"]
+                            v["content"]
                                 .as_array()
-                                .expect("to contain values")
+                                .expect("to contain content")
                                 .iter()
                                 .map(move |v| {
                                     Item::new_dependency(
-                                        v["id"].as_str().expect("to contain id feld").to_string(),
-                                        v["name"].as_str().expect("to contain id name").to_string(),
+                                        v["id"].as_str().expect("to contain id").to_string(),
+                                        v["name"].as_str().expect("to contain name").to_string(),
                                         group.clone(),
                                     )
                                 })
@@ -196,25 +203,29 @@ mod test {
     #[test]
     fn test_simple_parse() {
         let json = json!({
-            "language": {
-                "type": "single-select",
-                "default": "java",
-                "values": [
-                    {
-                        "id": "java",
-                        "name": "Java"
-                    },
-                    {
-                        "id": "kotlin",
-                        "name": "Kotlin"
-                    },
-                    {
-                        "id": "groovy",
-                        "name": "Groovy"
-                    }
-                ]
-            }
-        });
+        "languages": {
+            "id": "language",
+            "type": "SINGLE_SELECT",
+            "title": "Language",
+            "description": "programming language",
+            "content": [
+                {
+                    "name": "Java",
+                    "id": "java",
+                    "default": true
+                },
+                {
+                    "name": "Kotlin",
+                    "id": "kotlin",
+                    "default": false
+                },
+                {
+                    "name": "Groovy",
+                    "id": "groovy",
+                    "default": false
+                }
+            ]
+        }});
         let steps = Step::from_json(json);
         assert!(steps.is_ok());
         let steps = steps.unwrap();
@@ -239,10 +250,21 @@ mod test {
     #[test]
     fn test_multi_select_parse() {
         let json: serde_json::Value = json!({
-            "dependencies": {
-                "type": "hierarchical-multi-select",
-                "values": [{ "name": "Deps","values": [{"id": "native","name": "GraalVM Native Support"}]}]},
-        });
+        "dependencies": {
+            "id": "dependencies",
+            "type": "HIERARCHICAL_MULTI_SELECT",
+            "content": [
+                {
+                    "name": "Deps",
+                    "content": [
+                        {
+                            "name": "GraalVM Native Support",
+                            "id": "native"
+                        }
+                    ]
+                }
+            ]
+        }});
         let steps = Step::from_json(json);
         assert!(steps.is_ok());
         let steps = steps.unwrap();
@@ -264,29 +286,66 @@ mod test {
     }
 
     #[test]
+    fn test_action_parse() {
+        let json: serde_json::Value = json!({
+        "types": {
+           "id": "type",
+           "type": "ACTION",
+           "content": [
+               {
+                   "name": "Gradle - Groovy",
+                   "id": "gradle-project",
+                   "action": "/starter.zip",
+                   "default": true
+               }]
+            }});
+        let steps = Step::from_json(json);
+        assert!(steps.is_ok());
+        let steps = steps.unwrap();
+
+        assert_eq!(steps.len(), 1);
+        assert_eq!(
+            steps[0],
+            Step {
+                name: "types".to_string(),
+                kind: steps::StepKind::Action {
+                    default: "gradle-project".to_owned(),
+                    values: vec![Item::new_action(
+                        "gradle-project".to_owned(),
+                        "Gradle - Groovy".to_owned(),
+                        "/starter.zip".to_owned()
+                    )]
+                }
+            }
+        );
+    }
+
+    #[test]
     fn test_multible_parse() {
         let json = json!({
             "language": {
-                "type": "single-select",
-                "default": "java",
-                "values": [
+                "type": "SINGLE_SELECT",
+                "content": [
                     {
                         "id": "java",
-                        "name": "Java"
+                        "name": "Java",
+                        "default":true
                     },
                     {
                         "id": "kotlin",
-                        "name": "Kotlin"
+                        "name": "Kotlin",
+                        "default":false
                     },
                     {
                         "id": "groovy",
-                        "name": "Groovy"
+                        "name": "Groovy",
+                        "default":false
                     }
                 ]
             },
                "dep":{
-                "type":"text",
-                "default":"test"
+                "type":"TEXT",
+                "content":"test"
             },
         });
         let steps = Step::from_json(json);
