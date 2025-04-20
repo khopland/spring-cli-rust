@@ -1,12 +1,13 @@
 use std::{fs, io::Write};
 
-use anyhow::{Ok, Result};
+use anyhow::{Context, Ok, Result};
 use args::Args;
 use clap::Parser;
-use request::get_zip;
+use request::{get_zip, ResponseStep};
 use resolve_path::PathResolveExt;
+use std::io::Cursor;
 use steps::Step;
-use user_innput::ResponseStep;
+use zip::ZipArchive;
 
 mod args;
 mod request;
@@ -33,8 +34,16 @@ fn main() -> Result<()> {
 
 fn write_zip(file_name: &str, zip: Vec<u8>) -> Result<()> {
     let path = file_name.try_resolve()?;
-    println!("writing data to {}", path.display());
-    let mut file = fs::File::create(path)?;
-    file.write_all(&zip)?;
+    if path.extension().is_none() && ZipArchive::new(Cursor::new(&zip)).is_ok() {
+        fs::create_dir_all(&path)?;
+        println!("writing data to {}", path.display());
+        zip_extract::extract(Cursor::new(&zip), &path, true)?;
+    } else {
+        let parent = &path.parent().context("dident find parent of file")?;
+        fs::create_dir_all(parent)?;
+        println!("writing data to {}", path.display());
+        let mut file = fs::File::create(path)?;
+        file.write_all(&zip)?;
+    }
     Ok(())
 }

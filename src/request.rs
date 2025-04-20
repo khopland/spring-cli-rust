@@ -1,34 +1,29 @@
-use crate::{
-    steps::{ItemKind, StepKind},
-    user_innput::ResponseStep,
-};
+use crate::steps::{ItemKind, Step, StepKind};
 use anyhow::{Context, Result};
-use std::io::Read;
+use std::str::FromStr;
+use url::Url;
 
-pub fn get_options(url: &reqwest::Url) -> Result<serde_json::Value> {
-    let mut url = url.clone();
-    url.set_path("/metadata/config");
-    println!("getting parameter from {}", &url);
-    let response = reqwest::blocking::get(url)?;
-
-    if response.status() != 200 {
-        anyhow::bail!(
-            "failed to get options from {}, status code: {}",
-            response.url(),
-            response.status()
-        )
-    }
-    response.json().context("expect json back")
+#[derive(Debug, Clone, PartialEq)]
+pub struct ResponseStep {
+    pub step: Step,
+    pub response: String,
 }
 
-pub fn get_zip(
-    url: &reqwest::Url,
-    responses: &[ResponseStep],
-) -> Result<(Option<String>, Vec<u8>)> {
-    let mut url = url.clone();
-    let url_path = get_url_path(responses).context("action need to be set")?;
-    url.set_path(url_path);
+pub fn get_options(url: &str) -> Result<serde_json::Value> {
+    let url = Url::from_str(&url)?.join("/metadata/config")?;
 
+    println!("getting parameter from {}", &url);
+    ureq::get(url.as_str())
+        .call()?
+        .body_mut()
+        .read_json()
+        .context("expect json back")
+}
+
+pub fn get_zip(url: &str, responses: &[ResponseStep]) -> Result<(Option<String>, Vec<u8>)> {
+    let url = Url::parse(&url)?;
+
+    let mut url = url.join(get_url_path(responses).context("action need to be set")?)?;
     let mut querys = url.query_pairs_mut();
     responses.iter().for_each(|q| {
         if !q.response.is_empty() {
@@ -37,31 +32,27 @@ pub fn get_zip(
     });
     drop(querys);
 
-    let mut response = reqwest::blocking::get(url)?;
-    if response.status() != 200 {
-        anyhow::bail!(
-            "failed to get file status code: {}, from {} - {}",
-            response.status(),
-            response.url().clone(),
-            response.text()?
-        )
-    }
+    let mut response = ureq::get(url.as_str()).call()?;
 
-    let content_length = response.content_length().unwrap_or(0);
     let content_file = &response
         .headers()
         .get("content-disposition")
-        .and_then(get_file_name);
+        .and_then(|header| {
+            let Ok(value) = header.to_str() else {
+                return None;
+            };
 
-    let mut buf: Vec<u8> = Vec::with_capacity(content_length as usize);
-    let num = response.read_to_end(&mut buf)?;
-    if num != content_length as usize {
-        anyhow::bail!(
-            "failed to read all bites, read {}, but got {} from server",
-            num,
-            content_length
-        )
-    }
+            let (_, s) = value.split_once("=")?;
+            let mut chars = s.chars();
+            chars.next();
+            chars.next_back();
+            Some(chars.as_str().to_owned())
+        });
+
+    let body = response.body_mut();
+
+    let buf: Vec<u8> = body.read_to_vec()?;
+
     Ok((content_file.to_owned().map(|x| format!("./{}", x)), buf))
 }
 
@@ -78,18 +69,6 @@ fn get_url_path(responses: &[ResponseStep]) -> Option<&str> {
         }
         _ => None,
     })
-}
-
-fn get_file_name(header: &reqwest::header::HeaderValue) -> Option<String> {
-    let Ok(st) = header.to_str() else {
-        return None;
-    };
-
-    let (_, s) = st.split_once("=")?;
-    let mut chars = s.chars();
-    chars.next();
-    chars.next_back();
-    Some(chars.as_str().to_owned())
 }
 
 #[cfg(test)]
@@ -109,7 +88,7 @@ mod test {
         });
 
         let res = get_zip(
-            &reqwest::Url::parse(&server.url("/")).unwrap(),
+            &server.url("/"),
             &vec![ResponseStep {
                 step: Step {
                     name: "type".to_owned(),
