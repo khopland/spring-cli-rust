@@ -1,13 +1,10 @@
 use anyhow::Result;
 use inquire::{MultiSelect, Select, Text};
 
-use crate::steps::{Item, Step, StepKind};
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ResponseStep {
-    pub step: Step,
-    pub response: String,
-}
+use crate::{
+    request::ResponseStep,
+    steps::{Item, Step, StepKind},
+};
 
 fn get_multi_select(name: &str, values: &[Item]) -> Result<String> {
     Ok(MultiSelect::new(

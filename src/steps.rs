@@ -1,13 +1,13 @@
 use anyhow::{Context, Result};
 use std::fmt;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Item {
     pub id: String,
     pub name: String,
     pub kind: ItemKind,
 }
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ItemKind {
     Default,
     Dependency(String),
@@ -47,14 +47,14 @@ impl fmt::Display for Item {
         }
     }
 }
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 
 pub struct Step {
     pub name: String,
     pub kind: StepKind,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StepKind {
     Text { default: String },
     SingleSelect { default: String, values: Vec<Item> },
