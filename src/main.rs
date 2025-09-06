@@ -37,7 +37,8 @@ fn write_zip(file_name: &str, zip: Vec<u8>) -> Result<()> {
     if path.extension().is_none() && ZipArchive::new(Cursor::new(&zip)).is_ok() {
         fs::create_dir_all(&path)?;
         println!("writing data to {}", path.display());
-        zip_extract::extract(Cursor::new(&zip), &path, true)?;
+        let mut archive = ZipArchive::new(Cursor::new(&zip))?;
+        archive.extract(&path)?;
     } else {
         let parent = &path.parent().context("dident find parent of file")?;
         fs::create_dir_all(parent)?;
