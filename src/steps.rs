@@ -110,7 +110,7 @@ impl Step {
                     StepKind::SingleSelect { default, values }
                 }
                 "ACTION" => {
-                    let content: &Vec<serde_json::Value> =
+                    let content =
                         body["content"].as_array().context("get content action")?;
 
                     let default = content
