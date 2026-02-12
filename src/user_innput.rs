@@ -42,16 +42,22 @@ fn get_text(name: &str, default: &str) -> Result<String> {
         .prompt()?)
 }
 
-pub(crate) fn get_user_input(step: &Step) -> Result<ResponseStep> {
-    Ok(ResponseStep {
-        step: step.to_owned(),
-        response: match &step.kind {
+pub(crate) fn get_user_input(step: &Step, prefill: Option<&str>) -> Result<ResponseStep> {
+    let response = if let Some(value) = prefill {
+        value.to_string()
+    } else {
+        match &step.kind {
             StepKind::Text { default } => get_text(&step.name, default)?,
             StepKind::SingleSelect { default, values } => {
                 get_single_select(&step.name, values, default)?
             }
             StepKind::Action { default, values } => get_single_select(&step.name, values, default)?,
             StepKind::MultiSelect { values } => get_multi_select(&step.name, values)?,
-        },
+        }
+    };
+
+    Ok(ResponseStep {
+        step: step.to_owned(),
+        response,
     })
 }
