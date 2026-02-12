@@ -10,7 +10,7 @@ pub struct ResponseStep {
 }
 
 pub fn get_options(url: &str) -> Result<serde_json::Value> {
-    let url = Url::from_str(&url)?.join("/metadata/config")?;
+    let url = Url::from_str(url)?.join("/metadata/config")?;
 
     println!("getting parameter from {}", &url);
     ureq::get(url.as_str())
@@ -21,7 +21,7 @@ pub fn get_options(url: &str) -> Result<serde_json::Value> {
 }
 
 pub fn get_zip(url: &str, responses: &[ResponseStep]) -> Result<(Option<String>, Vec<u8>)> {
-    let url = Url::parse(&url)?;
+    let url = Url::parse(url)?;
 
     let mut url = url.join(get_url_path(responses).context("action need to be set")?)?;
     let mut querys = url.query_pairs_mut();

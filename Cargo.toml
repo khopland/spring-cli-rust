@@ -1,9 +1,9 @@
 [package]
 name = "spring-boot-cli"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
 authors = ["Kristoffer Larsen Hopland"]
-rust-version = " 1.82.0"
+rust-version = " 1.88.0"
 
 readme = "README.md"
 description = "A simple rust cli app to get spring starters"
@@ -23,7 +23,7 @@ inquire = "0.9.1"
 anyhow = "1"
 resolve-path = "0.1.0"
 clap = { version = "4", features = ["derive"] }
-zip = { version = "6"}
+zip = { version = "7"}
 ureq = { version = "3.1", features = ["json"] }
 url = "2.5"
 [dev-dependencies]

@@ -110,8 +110,7 @@ impl Step {
                     StepKind::SingleSelect { default, values }
                 }
                 "ACTION" => {
-                    let content =
-                        body["content"].as_array().context("get content action")?;
+                    let content = body["content"].as_array().context("get content action")?;
 
                     let default = content
                         .iter()
